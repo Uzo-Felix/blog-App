@@ -7,10 +7,10 @@ export default function Header(){
     useEffect(() => {
         fetch('http://localhost:4000/profile',{
             credentials: 'include',
-        }, []).then(response => response.json().then(userInfo => {
+        }).then(response => response.json().then(userInfo => {
             setUserInfo(userInfo);
         }))
-    })
+    }, [])
 
     async function logout() {
         await fetch('http://locaalhost:4000/logout', {
@@ -29,7 +29,7 @@ export default function Header(){
                 {username && (
                     <>
                     <Link to='/create'>Create new post</Link>
-                    <a onClick={logout}>Logout</a>
+                    <button onClick={logout}>Logout ({username})</button>
                     </>
                 )}
                 {!username && (
