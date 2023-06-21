@@ -12,8 +12,8 @@ export default function Header(){
         }))
     }, [])
 
-    async function logout() {
-        await fetch('http://locaalhost:4000/logout', {
+    function logout() {
+        fetch('http://locaalhost:4000/logout', {
             credentials: 'include',
             method: 'POST',
         });
