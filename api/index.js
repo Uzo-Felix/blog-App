@@ -14,7 +14,7 @@ const Post = require('./models/Post');
 const app = express();
 
 const salt = bcrypt.genSaltSync(10);
-const secret = "kdidididiieiikde83"
+const secret = "kdidididiieiikde83";
 
 app.use(cors({credentials: true, origin:'http://localhost:3000'}));
 app.use(express.json());
@@ -60,7 +60,6 @@ app.get('/profile', (req, res) => {
         if (error) throw error;
         res.json(info);
     })
-    res.json(req.cookies)
 })
 
 app.post('/logout', (req, res) => {
@@ -99,7 +98,12 @@ app.get('/post', async (req, res) => {
     .sort({createdAt: -1})
     .limit(20)
     );
-})
+});
 
+app.get('/post/:id', async (req, res) => {
+    const {id} = req.params;
+    const postDoc = await Post.findById(id);
+    res.json(postDoc);
+})
 
 app.listen(4000)
