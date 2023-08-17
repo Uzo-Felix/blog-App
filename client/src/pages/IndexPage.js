@@ -6,7 +6,7 @@ export default function IndexPage(){
     useEffect(() => {
         fetch(`${process.env.REACT_APP_API_URL}/post`).then(response => {
             response.json().then(posts => {
-                setPosts(posts);
+                setPosts(posts)
             });
         });
     }, []);
