@@ -13,19 +13,19 @@ const uploadMiddleware = multer({ dest: 'tmp/' });
 const fs = require('fs');
 
 const salt = bcrypt.genSaltSync(10);
-const secret = 'kdidididiieiikde83';
+const secret = process.env.SECRET;
 const bucket = 'felix-blog-app'
 
 app.use(cors({credentials:true,origin:'http://localhost:3000'}));
 app.use(express.json());
 app.use(cookieParser());
-app.use('/uploads', express.static(__dirname + '/uploads'));
+// app.use('/uploads', express.static(__dirname + '/uploads'));
 
-mongoose.connect('mongodb+srv://uzochukwu:FP6K6MRlZaAhSsdV@cluster0.lptnho9.mongodb.net/?retryWrites=true&w=majority').catch((err) => {console.error('Error connecting to MongoDB:', err);});
+mongoose.connect(MONGO_URI).catch((err) => {console.error('Error connecting to MongoDB:', err);});
 
 async function uploadToS3(path, originalFilename, mimetype){
     const client = new S3Client({
-        region: 'eu-north-1',
+        region: process.env.S3_REGION,
         credentials: {
           accessKeyId: process.env.S3_ACCESS_KEY,
           secretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
