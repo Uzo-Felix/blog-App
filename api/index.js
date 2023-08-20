@@ -89,8 +89,11 @@ app.post('/api/logout', (req,res) => {
 });
 
 app.post('/api/post', uploadMiddleware.single('file'), async (req,res) => {
-  const {originalname,path, mimetype} = req.file;
-  await uploadToS3(path, originalname, mimetype);
+  let filePath = null;
+  if (req.file) {
+    const {originalname,path, mimetype} = req.file;
+    filePath = await uploadToS3(path, originalname, mimetype);
+  }
   
   const {token} = req.cookies;
   jwt.verify(token, secret, {}, async (err,info) => {
@@ -100,7 +103,7 @@ app.post('/api/post', uploadMiddleware.single('file'), async (req,res) => {
       title,
       summary,
       content,
-      cover:newFilename,
+      cover:filePath,
       author:info.id,
     });
     res.json(postDoc);
