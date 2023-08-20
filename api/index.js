@@ -8,20 +8,43 @@ const app = express();
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
 const multer = require('multer');
-const uploadMiddleware = multer({ dest: 'uploads/' });
+const {S3Client, PutObjectCommand} = require('@aws-sdk/client-s3')
+const uploadMiddleware = multer({ dest: 'tmp/' });
 const fs = require('fs');
 
 const salt = bcrypt.genSaltSync(10);
-const secret = 'asdfe45we45w345wegw345werjktjwertkj';
+const secret = 'kdidididiieiikde83';
+const bucket = 'felix-blog-app'
 
 app.use(cors({credentials:true,origin:'http://localhost:3000'}));
 app.use(express.json());
 app.use(cookieParser());
 app.use('/uploads', express.static(__dirname + '/uploads'));
 
-mongoose.connect(process.env.MONGO_URI);
+mongoose.connect('mongodb+srv://uzochukwu:FP6K6MRlZaAhSsdV@cluster0.lptnho9.mongodb.net/?retryWrites=true&w=majority').catch((err) => {console.error('Error connecting to MongoDB:', err);});
 
-app.post('/register', async (req,res) => {
+async function uploadToS3(path, originalFilename, mimetype){
+    const client = new S3Client({
+        region: 'eu-north-1',
+        credentials: {
+          accessKeyId: process.env.S3_ACCESS_KEY,
+          secretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
+        }
+    });
+    const parts = originalFilename.split('.');
+    const ext = parts[parts.length - 1];
+    const newFilename = Date.now() + '.' + ext;
+    await client.send(new PutObjectCommand({
+      Bucket: bucket,
+      Body: fs.readFileSync(path),
+      Key: newFilename,
+      ContentType: mimetype,
+      ACL: 'public-read',
+    }));
+    return `https://${bucket}.s3.amazonaws.com/${newFilename}`
+}
+
+app.post('/api/register', async (req,res) => {
   const {username,password} = req.body;
   try{
     const userDoc = await User.create({
@@ -35,7 +58,7 @@ app.post('/register', async (req,res) => {
   }
 });
 
-app.post('/login', async (req,res) => {
+app.post('/api/login', async (req,res) => {
   const {username,password} = req.body;
   const userDoc = await User.findOne({username});
   const passOk = bcrypt.compareSync(password, userDoc.password);
@@ -53,7 +76,7 @@ app.post('/login', async (req,res) => {
   }
 });
 
-app.get('/profile', (req,res) => {
+app.get('/api/profile', (req,res) => {
   const {token} = req.cookies;
   jwt.verify(token, secret, {}, (err,info) => {
     if (err) throw err;
@@ -61,17 +84,14 @@ app.get('/profile', (req,res) => {
   });
 });
 
-app.post('/logout', (req,res) => {
+app.post('/api/logout', (req,res) => {
   res.cookie('token', '').json('ok');
 });
 
-app.post('/post', uploadMiddleware.single('file'), async (req,res) => {
-  const {originalname,path} = req.file;
-  const parts = originalname.split('.');
-  const ext = parts[parts.length - 1];
-  const newPath = path+'.'+ext;
-  fs.renameSync(path, newPath);
-
+app.post('/api/post', uploadMiddleware.single('file'), async (req,res) => {
+  const {originalname,path, mimetype} = req.file;
+  await uploadToS3(path, originalname, mimetype);
+  
   const {token} = req.cookies;
   jwt.verify(token, secret, {}, async (err,info) => {
     if (err) throw err;
@@ -80,22 +100,19 @@ app.post('/post', uploadMiddleware.single('file'), async (req,res) => {
       title,
       summary,
       content,
-      cover:newPath,
+      cover:newFilename,
       author:info.id,
     });
     res.json(postDoc);
   });
-
+  
 });
 
-app.put('/post',uploadMiddleware.single('file'), async (req,res) => {
-  let newPath = null;
+app.put('/api/post',uploadMiddleware.single('file'), async (req,res) => {
+  let newFilename = null;
   if (req.file) {
-    const {originalname,path} = req.file;
-    const parts = originalname.split('.');
-    const ext = parts[parts.length - 1];
-    newPath = path+'.'+ext;
-    fs.renameSync(path, newPath);
+    const {originalname,path, mimetype} = req.file;
+    await uploadToS3(path, originalname, mimetype);
   }
 
   const {token} = req.cookies;
@@ -111,7 +128,7 @@ app.put('/post',uploadMiddleware.single('file'), async (req,res) => {
       title,
       summary,
       content,
-      cover: newPath ? newPath : postDoc.cover,
+      cover: newFilename ? newFilename : postDoc.cover,
     });
 
     res.json(postDoc);
@@ -119,7 +136,7 @@ app.put('/post',uploadMiddleware.single('file'), async (req,res) => {
 
 });
 
-app.get('/post', async (req,res) => {
+app.get('/api/post', async (req,res) => {
   res.json(
     await Post.find()
       .populate('author', ['username'])
@@ -128,7 +145,7 @@ app.get('/post', async (req,res) => {
   );
 });
 
-app.get('/post/:id', async (req, res) => {
+app.get('/api/post/:id', async (req, res) => {
   const {id} = req.params;
   const postDoc = await Post.findById(id).populate('author', ['username']);
   res.json(postDoc);
