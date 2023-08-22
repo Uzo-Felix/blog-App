@@ -11,7 +11,7 @@ export default function EditPost() {
   const [redirect,setRedirect] = useState(false);
 
   useEffect(() => {
-    fetch(`${process.env.REACT_APP_API_URL}/post/`+id)
+    fetch(`api/post/`+id)
       .then(response => {
         response.json().then(postInfo => {
           setTitle(postInfo.title);

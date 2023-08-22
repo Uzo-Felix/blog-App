@@ -1,4 +1,5 @@
 const express = require('express');
+require('dotenv').config();
 const cors = require('cors');
 const mongoose = require("mongoose");
 const User = require('./models/User');
@@ -8,20 +9,54 @@ const app = express();
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
 const multer = require('multer');
+const multerS3 = require('multer-s3');
+const AWS = require('aws-sdk');
 const {S3Client, PutObjectCommand} = require('@aws-sdk/client-s3')
-const uploadMiddleware = multer({ dest: 'tmp/' });
 const fs = require('fs');
 
+app.use(express.urlencoded({ extended: false }));
+// app.use(cors({credentials:true,origin:['http://localhost:3000', 'https://blog-app-uzo-felix.vercel.app/', 'https://blog-app-m6t9.vercel.app/', 'https://felix-blog-3xwh9013v-uzo-felix.vercel.app/']}));
+// app.use(cors())
+app.use(express.json());
+app.use(cookieParser());
+const http = require('http');
+const server = http.createServer(app);
+
+const s3 = new AWS.S3();
 const salt = bcrypt.genSaltSync(10);
 const secret = process.env.SECRET;
 const bucket = 'felix-blog-app'
 
-app.use(cors({credentials:true,origin:'http://localhost:3000'}));
-app.use(express.json());
-app.use(cookieParser());
 // app.use('/uploads', express.static(__dirname + '/uploads'));
+const mongoURI = process.env.MONGO_URI;
+const port = process.env.PORT || 4000;
 
-mongoose.connect(MONGO_URI).catch((err) => {console.error('Error connecting to MongoDB:', err);});
+mongoose.connect(mongoURI)
+  .then(() => {
+    console.log('Connected to MongoDB');
+
+    server.listen(port, () => {
+      console.log(`Server is running on  port ${port}`)
+    });
+  })
+  .catch((error) => {
+    console.error('Error connecting to MongoDB:', error);
+    process.exit(1);
+  })
+
+const upload = multer({
+  storage: multerS3({
+    s3,
+    bucket: bucket,
+    acl: 'public-read',
+    metadata: function (req, file, cb){
+      cb(null, {fieldName: file.fieldname});
+    },
+    key: function (req, file, cb){
+      cb(null, Date.now().toString())
+    }
+  })
+});
 
 async function uploadToS3(path, originalFilename, mimetype){
     const client = new S3Client({
@@ -60,20 +95,29 @@ app.post('/api/register', async (req,res) => {
 
 app.post('/api/login', async (req,res) => {
   const {username,password} = req.body;
-  const userDoc = await User.findOne({username});
-  const passOk = bcrypt.compareSync(password, userDoc.password);
-  if (passOk) {
-    // logged in
-    jwt.sign({username,id:userDoc._id}, secret, {}, (err,token) => {
-      if (err) throw err;
-      res.cookie('token', token).json({
-        id:userDoc._id,
-        username,
-      });
-    });
-  } else {
-    res.status(400).json('wrong credentials');
-  }
+
+  // try{
+    const userDoc = await User.findOne({username});
+    if(!userDoc){
+      return res.status(404).json({error: 'User not found'});
+    }
+    const passOk = bcrypt.compareSync(password, userDoc.password);
+
+    if (passOk) {
+      jwt.sign({username,id:userDoc._id}, secret, {}, (err, token) =>{
+        if(err) throw err;
+        return res.status(200).cookie('token', token).json({
+          id:userDoc._id,
+          username,
+        });
+      }
+        );
+    } else {
+      return res.status(401).json({error: 'Wrong credentials'});
+    }
+  // } catch (error){
+  //   return res.status(500).json({error: 'Internal server error'})
+  // }
 });
 
 app.get('/api/profile', (req,res) => {
@@ -88,7 +132,7 @@ app.post('/api/logout', (req,res) => {
   res.cookie('token', '').json('ok');
 });
 
-app.post('/api/post', uploadMiddleware.single('file'), async (req,res) => {
+app.post('/api/post', upload.single('file'), async (req,res) => {
   let filePath = null;
   if (req.file) {
     const {originalname,path, mimetype} = req.file;
@@ -111,11 +155,11 @@ app.post('/api/post', uploadMiddleware.single('file'), async (req,res) => {
   
 });
 
-app.put('/api/post',uploadMiddleware.single('file'), async (req,res) => {
-  let newFilename = null;
+app.put('/api/post',upload.single('file'), async (req,res) => {
+  let filePath = null;
   if (req.file) {
     const {originalname,path, mimetype} = req.file;
-    await uploadToS3(path, originalname, mimetype);
+    filePath = await uploadToS3(path, originalname, mimetype);
   }
 
   const {token} = req.cookies;
@@ -127,11 +171,11 @@ app.put('/api/post',uploadMiddleware.single('file'), async (req,res) => {
     if (!isAuthor) {
       return res.status(400).json('you are not the author');
     }
-    await postDoc.update({
+    await postDoc.updateOne({
       title,
       summary,
       content,
-      cover: newFilename ? newFilename : postDoc.cover,
+      cover: filePath ? filePath : postDoc.cover,
     });
 
     res.json(postDoc);
@@ -154,5 +198,4 @@ app.get('/api/post/:id', async (req, res) => {
   res.json(postDoc);
 })
 
-app.listen(4000);
 //
