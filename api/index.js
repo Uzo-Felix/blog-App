@@ -15,7 +15,7 @@ const {S3Client, PutObjectCommand} = require('@aws-sdk/client-s3')
 const fs = require('fs');
 
 app.use(express.urlencoded({ extended: false }));
-// app.use(cors({credentials:true,origin:['http://localhost:3000', 'https://blog-app-uzo-felix.vercel.app/', 'https://blog-app-m6t9.vercel.app/', 'https://felix-blog-3xwh9013v-uzo-felix.vercel.app/']}));
+app.use(cors({credentials:true,origin:['http://localhost:3000', 'https://blog-app-uzo-felix.vercel.app/', 'https://blog-app-m6t9.vercel.app/', 'https://felix-blog-3xwh9013v-uzo-felix.vercel.app/']}));
 // app.use(cors())
 app.use(express.json());
 app.use(cookieParser());
@@ -194,8 +194,12 @@ app.get('/api/post', async (req,res) => {
 
 app.get('/api/post/:id', async (req, res) => {
   const {id} = req.params;
-  const postDoc = await Post.findById(id).populate('author', ['username']);
-  res.json(postDoc);
+  try{
+    const postDoc = await Post.findById(id).populate('author', ['username']);
+    res.json(postDoc);
+  } catch (err){
+    console.log(err);
+  }
 })
 
 //

@@ -2,6 +2,7 @@ import { useEffect, useState, useContext } from "react";
 import {useParams, Link} from 'react-router-dom';
 import {formatISO9075} from 'date-fns';
 import {UserContext} from '../UserContext';
+import Loading from '../Loading';
 
 export default function PostPage(){
     const [postInfo, setPostInfo] = useState(null);
@@ -16,7 +17,7 @@ export default function PostPage(){
         })
     }, [])
 
-    if(!postInfo) return '';
+     if (!postInfo) return (<Loading />);
     return(
         <div className="post-page">
             <h1>{postInfo.title}</h1>

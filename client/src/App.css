@@ -173,3 +173,15 @@ div.post-page a.edit-btn{
 a svg{
   height:20px;
 }
+
+.loading-container{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+
+loading-container > img{
+  width: 20px;
+  height: 20px;
+}
